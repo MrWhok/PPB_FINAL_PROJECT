@@ -1,14 +1,47 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
+import 'add_topic_screen.dart';
+import '../../services/topic_service.dart';
+import '../../models/topic.dart';
 
-// Person B feature — Topic Library (Week 1: placeholder)
+// Person B feature — Topic Library (Week 1)
 class TopicsScreen extends StatelessWidget {
   const TopicsScreen({super.key});
+
+  void _seedData(BuildContext context) async {
+    final topicService = TopicService();
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Seeding data...')),
+      );
+      await topicService.seedSampleTopics(kSampleTopics);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Data seeded successfully! Check Firestore.')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error seeding data: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('TOPIC LIBRARY')),
+      appBar: AppBar(
+        title: const Text('TOPIC LIBRARY'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.cloud_upload),
+            tooltip: 'Seed Sample Data',
+            onPressed: () => _seedData(context),
+          ),
+        ],
+      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -60,6 +93,17 @@ class TopicsScreen extends StatelessWidget {
             ],
           ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AddTopicScreen(),
+            ),
+          );
+        },
+        child: const Icon(Icons.add),
       ),
     );
   }
