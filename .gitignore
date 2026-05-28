@@ -11,6 +11,9 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+claude.md
+
+android\app\google-services.json
 
 # IntelliJ related
 *.iml
@@ -46,4 +49,6 @@ app.*.map.json
 
 # Secret keys — NEVER commit real API keys
 lib/config/secrets.dart
+lib/firebase_options.dart
+google-services.json
 .env
