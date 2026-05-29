@@ -12,6 +12,7 @@
 .swiftpm/
 migrate_working_dir/
 CLAUDE.md
+.claude/
 
 android\app\google-services.json
 

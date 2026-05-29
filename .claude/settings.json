@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(find /c/Users/Aydin/AppData/Local/Pub/Cache/hosted/pub.dev/record-5.0.5 -name \"*.dart\" | head -5 && cat /c/Users/Aydin/AppData/Local/Pub/Cache/hosted/pub.dev/record-5.0.5/lib/record.dart 2>/dev/null | head -30)",
-      "Read(//c/Users/Aydin/AppData/Local/Pub/Cache/hosted/pub.dev/**)",
-      "Read(//c/Users/Aydin/AppData/Local/Pub/Cache/hosted/pub.dev/record-5.0.5/lib/**)"
-    ]
-  }
-}
