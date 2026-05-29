@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:record/record.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import '../../models/debate_session.dart';
 import '../../models/message.dart';
 import '../../services/ai_service.dart';
@@ -18,23 +21,139 @@ class _DebateChatScreenState extends State<DebateChatScreen> {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final AIService _aiService = AIService();
+  final AudioRecorder _recorder = AudioRecorder();
+  final FlutterTts _tts = FlutterTts();
 
   late String _currentStance;
   bool _isAiThinking = false;
   bool _sessionEnded = false;
   List<Message> _messages = [];
 
+  // Voice state
+  String _language = 'en'; // 'en' or 'id'
+  bool _isRecording = false; // mic is actively recording audio
+  bool _isTranscribing = false; // waiting on Whisper transcription
+  bool _autoSpeak = false; // auto read AI replies aloud
+  String? _speakingMessageId; // id of message currently being read aloud
+
   @override
   void initState() {
     super.initState();
     _currentStance = widget.session.stance;
+    _initTts();
   }
+
+  Future<void> _initTts() async {
+    await _tts.setSpeechRate(0.5);
+    await _tts.setPitch(1.0);
+    _tts.setCompletionHandler(() {
+      if (mounted) setState(() => _speakingMessageId = null);
+    });
+  }
+
+  String get _ttsLanguage => _language == 'id' ? 'id-ID' : 'en-US';
 
   @override
   void dispose() {
     _inputController.dispose();
     _scrollController.dispose();
+    _recorder.dispose();
+    _tts.stop();
     super.dispose();
+  }
+
+  // --- Voice input: record audio, then transcribe with Groq Whisper ---
+
+  Future<void> _toggleRecording() async {
+    if (_isTranscribing) return;
+
+    if (_isRecording) {
+      await _stopAndTranscribe();
+      return;
+    }
+
+    // Start recording
+    await _stopSpeaking();
+    if (!await _recorder.hasPermission()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Microphone permission denied.')),
+        );
+      }
+      return;
+    }
+    final dir = await getTemporaryDirectory();
+    final path =
+        '${dir.path}/debate_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    await _recorder.start(const RecordConfig(), path: path);
+    if (mounted) setState(() => _isRecording = true);
+  }
+
+  Future<void> _stopAndTranscribe() async {
+    final path = await _recorder.stop();
+    setState(() {
+      _isRecording = false;
+      _isTranscribing = true;
+    });
+
+    if (path == null) {
+      if (mounted) setState(() => _isTranscribing = false);
+      return;
+    }
+
+    try {
+      final text = await _aiService.transcribeAudio(
+        filePath: path,
+        language: _language,
+      );
+      if (text.isNotEmpty) {
+        // Append the transcript to whatever is already in the box — never wipes
+        final existing = _inputController.text.trim();
+        _inputController.text =
+            existing.isEmpty ? text : '$existing $text';
+        _inputController.selection = TextSelection.fromPosition(
+          TextPosition(offset: _inputController.text.length),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Could not transcribe audio. Check connection.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isTranscribing = false);
+    }
+  }
+
+  // --- Voice: text-to-speech output ---
+
+  Future<void> _speak(Message message) async {
+    if (_speakingMessageId == message.messageId) {
+      await _stopSpeaking();
+      return;
+    }
+    await _stopSpeaking();
+    await _tts.setLanguage(_ttsLanguage);
+    setState(() => _speakingMessageId = message.messageId);
+    await _tts.speak(message.content);
+  }
+
+  Future<void> _stopSpeaking() async {
+    await _tts.stop();
+    if (mounted) setState(() => _speakingMessageId = null);
+  }
+
+  void _switchLanguage(String lang) {
+    if (lang == _language) return;
+    _stopSpeaking();
+    setState(() => _language = lang);
+  }
+
+  void _toggleAutoSpeak() {
+    setState(() => _autoSpeak = !_autoSpeak);
+    if (!_autoSpeak) _stopSpeaking();
   }
 
   Stream<QuerySnapshot> get _messagesStream => FirebaseFirestore.instance
@@ -71,9 +190,11 @@ class _DebateChatScreenState extends State<DebateChatScreen> {
         userArgument: text,
         topic: widget.session.topicTitle,
         stance: _currentStance,
+        language: _language,
         previousMessages: _messages,
       );
-      await _saveMessage(role: 'ai', content: aiReply);
+      final aiMessage = await _saveMessage(role: 'ai', content: aiReply);
+      if (_autoSpeak && mounted) _speak(aiMessage);
     } catch (e) {
       await _saveMessage(
         role: 'ai',
@@ -88,7 +209,7 @@ class _DebateChatScreenState extends State<DebateChatScreen> {
     }
   }
 
-  Future<void> _saveMessage({
+  Future<Message> _saveMessage({
     required String role,
     required String content,
   }) async {
@@ -98,13 +219,15 @@ class _DebateChatScreenState extends State<DebateChatScreen> {
         .collection('messages')
         .doc();
 
-    await ref.set(Message(
+    final message = Message(
       messageId: ref.id,
       sessionId: widget.session.sessionId,
       role: role,
       content: content,
       timestamp: DateTime.now(),
-    ).toMap());
+    );
+    await ref.set(message.toMap());
+    return message;
   }
 
   Future<void> _editStance() async {
@@ -149,6 +272,7 @@ class _DebateChatScreenState extends State<DebateChatScreen> {
         topic: widget.session.topicTitle,
         stance: _currentStance,
         messages: _messages,
+        language: _language,
       );
 
       final score = result['score'] as int;
@@ -312,7 +436,90 @@ class _DebateChatScreenState extends State<DebateChatScreen> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          const SizedBox(width: 8),
+          _buildAutoSpeakToggle(),
+          const SizedBox(width: 8),
+          _buildLanguageToggle(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAutoSpeakToggle() {
+    return GestureDetector(
+      onTap: _toggleAutoSpeak,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: _autoSpeak
+              ? AppTheme.secondary.withValues(alpha: 0.15)
+              : AppTheme.surfaceVar,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: _autoSpeak ? AppTheme.secondary : AppTheme.border,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _autoSpeak ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+              size: 13,
+              color: _autoSpeak ? AppTheme.secondary : AppTheme.textSecondary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Auto',
+              style: TextStyle(
+                color: _autoSpeak ? AppTheme.secondary : AppTheme.textSecondary,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLanguageToggle() {
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceVar,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Row(
+        children: [
+          _langChip('EN', 'en'),
+          _langChip('ID', 'id'),
+        ],
+      ),
+    );
+  }
+
+  Widget _langChip(String label, String lang) {
+    final isSelected = _language == lang;
+    return GestureDetector(
+      onTap: () => _switchLanguage(lang),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : AppTheme.textSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5,
+          ),
+        ),
       ),
     );
   }
@@ -457,12 +664,50 @@ class _DebateChatScreenState extends State<DebateChatScreen> {
           ),
           Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              _formatTime(message.timestamp),
-              style: const TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 10,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _formatTime(message.timestamp),
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 10,
+                  ),
+                ),
+                if (!isUser) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => _speak(message),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _speakingMessageId == message.messageId
+                              ? Icons.stop_circle_outlined
+                              : Icons.volume_up_rounded,
+                          color: _speakingMessageId == message.messageId
+                              ? AppTheme.secondary
+                              : AppTheme.textSecondary,
+                          size: 15,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          _speakingMessageId == message.messageId
+                              ? 'Stop'
+                              : 'Listen',
+                          style: TextStyle(
+                            color: _speakingMessageId == message.messageId
+                                ? AppTheme.secondary
+                                : AppTheme.textSecondary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
@@ -522,6 +767,44 @@ class _DebateChatScreenState extends State<DebateChatScreen> {
     );
   }
 
+  Widget _buildMicButton() {
+    final disabled = _isAiThinking || _isTranscribing;
+    return GestureDetector(
+      onTap: disabled ? null : _toggleRecording,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: _isRecording
+              ? AppTheme.conColor.withValues(alpha: 0.15)
+              : AppTheme.surfaceVar,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: _isRecording ? AppTheme.conColor : AppTheme.border,
+          ),
+        ),
+        child: _isTranscribing
+            ? const Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    color: AppTheme.secondary,
+                    strokeWidth: 2,
+                  ),
+                ),
+              )
+            : Icon(
+                _isRecording ? Icons.stop_rounded : Icons.mic_rounded,
+                color:
+                    _isRecording ? AppTheme.conColor : AppTheme.textSecondary,
+                size: 22,
+              ),
+      ),
+    );
+  }
+
   Widget _buildInputArea() {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     return Container(
@@ -533,6 +816,8 @@ class _DebateChatScreenState extends State<DebateChatScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          _buildMicButton(),
+          const SizedBox(width: 8),
           Expanded(
             child: TextField(
               controller: _inputController,
@@ -542,7 +827,13 @@ class _DebateChatScreenState extends State<DebateChatScreen> {
               minLines: 1,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
-                hintText: 'Make your argument...',
+                hintText: _isRecording
+                    ? 'Recording... tap mic to stop'
+                    : _isTranscribing
+                        ? 'Transcribing...'
+                        : (_language == 'id'
+                            ? 'Sampaikan argumenmu...'
+                            : 'Make your argument...'),
                 hintStyle:
                     const TextStyle(color: AppTheme.textSecondary),
                 filled: true,
