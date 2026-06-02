@@ -1,27 +1,40 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import 'add_topic_screen.dart';
+import 'edit_topic_screen.dart';
 import '../../services/topic_service.dart';
 import '../../models/topic.dart';
 
-// Person B feature — Topic Library (Week 1)
-class TopicsScreen extends StatelessWidget {
+class TopicsScreen extends StatefulWidget {
   const TopicsScreen({super.key});
 
+  @override
+  State<TopicsScreen> createState() => _TopicsScreenState();
+}
+
+class _TopicsScreenState extends State<TopicsScreen> {
+  final TopicService _topicService = TopicService();
+  String _searchQuery = '';
+  String _selectedCategory = 'All';
+
+  final List<String> _categories = [
+    'All', 'Technology', 'Society', 'Economics', 'Science', 
+    'Education', 'Environment', 'Ethics', 'Politics', 'General'
+  ];
+
   void _seedData(BuildContext context) async {
-    final topicService = TopicService();
     try {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Seeding data...')),
       );
-      await topicService.seedSampleTopics(kSampleTopics);
-      if (context.mounted) {
+      await _topicService.seedSampleTopics(kSampleTopics);
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Data seeded successfully! Check Firestore.')),
         );
       }
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error seeding data: $e')),
         );
@@ -42,57 +55,115 @@ class TopicsScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: AppTheme.secondary.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                      color: AppTheme.secondary.withValues(alpha: 0.3)),
+      body: Column(
+        children: [
+          // Filter Section
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    decoration: const InputDecoration(
+                      labelText: 'Search topics',
+                      prefixIcon: Icon(Icons.search),
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value;
+                      });
+                    },
+                  ),
                 ),
-                child: const Icon(Icons.library_books,
-                    color: AppTheme.secondary, size: 36),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'TOPIC LIBRARY',
-                style: TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1,
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 1,
+                  child: DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: 'Category',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    value: _selectedCategory,
+                    items: _categories.map((String category) {
+                      return DropdownMenuItem<String>(
+                        value: category,
+                        child: Text(category, overflow: TextOverflow.ellipsis),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedCategory = newValue!;
+                      });
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'PERSON B',
-                style: TextStyle(
-                  color: AppTheme.secondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 2,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Browse, search, add, edit, and delete debate topics.\nComing in Week 1 from Person B.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontSize: 14,
-                  height: 1.6,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+          
+          // List Section
+          Expanded(
+            child: StreamBuilder<List<Topic>>(
+              stream: _topicService.getTopics(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
+                
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(child: Text('No topics found. Add some or click the seed button!'));
+                }
+
+                // Apply Local Filters
+                List<Topic> filteredTopics = snapshot.data!.where((topic) {
+                  final matchesSearch = topic.title.toLowerCase().contains(_searchQuery.toLowerCase());
+                  final matchesCategory = _selectedCategory == 'All' || topic.category == _selectedCategory;
+                  return matchesSearch && matchesCategory;
+                }).toList();
+
+                if (filteredTopics.isEmpty) {
+                  return const Center(child: Text('No topics match your filters.'));
+                }
+
+                return ListView.builder(
+                  itemCount: filteredTopics.length,
+                  itemBuilder: (context, index) {
+                    final topic = filteredTopics[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: ListTile(
+                        title: Text(
+                          topic.title,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text('${topic.category} • ${topic.difficulty.toUpperCase()}'),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.edit, color: AppTheme.secondary),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EditTopicScreen(topic: topic),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {

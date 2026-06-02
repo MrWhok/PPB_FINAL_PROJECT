@@ -42,4 +42,21 @@ class TopicService {
       throw Exception('Failed to seed topics: $e');
     }
   }
+
+  Stream<List<Topic>> getTopics() {
+    return _firestore.collection(_collectionName).snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) => Topic.fromMap(doc.data())).toList();
+    });
+  }
+
+  Future<void> updateTopic(Topic topic) async {
+    try {
+      await _firestore
+          .collection(_collectionName)
+          .doc(topic.topicId)
+          .update(topic.toMap());
+    } catch (e) {
+      throw Exception('Failed to update topic: $e');
+    }
+  }
 }
