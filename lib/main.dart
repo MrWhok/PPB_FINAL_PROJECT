@@ -1,20 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'screens/main_scaffold.dart';
+import 'screens/auth/login_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (e) {
-    // Firebase not configured yet — UI renders but Firestore saves won't work.
-    // Run "flutterfire configure" to fix this.
-    debugPrint('Firebase init skipped: $e');
-  }
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const DebateCoachApp());
 }
 
@@ -27,7 +23,29 @@ class DebateCoachApp extends StatelessWidget {
       title: 'DebateCoach',
       theme: AppTheme.dark,
       debugShowCheckedModeBanner: false,
-      home: const MainScaffold(),
+      home: const AuthWrapper(),
+    );
+  }
+}
+
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(color: AppTheme.primary),
+            ),
+          );
+        }
+        if (snapshot.hasData) return const MainScaffold();
+        return const LoginScreen();
+      },
     );
   }
 }
