@@ -59,4 +59,12 @@ class TopicService {
       throw Exception('Failed to update topic: $e');
     }
   }
+
+  Future<void> deleteTopic(String topicId) async {
+    try {
+      await _firestore.collection(_collectionName).doc(topicId).delete();
+    } catch (e) {
+      throw Exception('Failed to delete topic: $e');
+    }
+  }
 }
