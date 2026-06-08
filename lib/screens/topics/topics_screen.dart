@@ -4,6 +4,7 @@ import 'add_topic_screen.dart';
 import 'edit_topic_screen.dart';
 import '../../services/topic_service.dart';
 import '../../models/topic.dart';
+import 'topic_detail_screen.dart';
 
 class TopicsScreen extends StatefulWidget {
   const TopicsScreen({super.key});
@@ -40,6 +41,44 @@ class _TopicsScreenState extends State<TopicsScreen> {
         );
       }
     }
+  }
+
+  void _confirmDelete(BuildContext context, Topic topic) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Hapus Topik?'),
+          content: Text('Apakah Anda yakin ingin menghapus topik "${topic.title}"? Tindakan ini tidak dapat dibatalkan.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context); // Close dialog
+                try {
+                  await _topicService.deleteTopic(topic.topicId);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Topik "${topic.title}" berhasil dihapus.')),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Gagal menghapus topik: $e')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Hapus', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -140,21 +179,40 @@ class _TopicsScreenState extends State<TopicsScreen> {
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: ListTile(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => TopicDetailScreen(topic: topic),
+                            ),
+                          );
+                        },
                         title: Text(
                           topic.title,
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Text('${topic.category} • ${topic.difficulty.toUpperCase()}'),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.edit, color: AppTheme.secondary),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => EditTopicScreen(topic: topic),
-                              ),
-                            );
-                          },
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: AppTheme.secondary),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => EditTopicScreen(topic: topic),
+                                  ),
+                                );
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () {
+                                _confirmDelete(context, topic);
+                              },
+                            ),
+                          ],
                         ),
                       ),
                     );
