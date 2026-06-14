@@ -1,53 +1,97 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import 'firebase_options.dart';
-import 'screens/main_scaffold.dart';
-import 'screens/auth/login_screen.dart';
-import 'theme/app_theme.dart';
-import 'services/notification_service.dart';
+
+// Data layer
+import 'data/remote/ai_remote_datasource.dart';
+import 'data/remote/wikipedia_remote_datasource.dart';
+import 'data/remote/notification_datasource.dart';
+import 'data/repository/auth_repository_impl.dart';
+import 'data/repository/debate_repository_impl.dart';
+import 'data/repository/topic_repository_impl.dart';
+
+// Domain — repository interfaces (used as provider keys)
+import 'domain/repository/auth_repository.dart';
+import 'domain/repository/debate_repository.dart';
+import 'domain/repository/topic_repository.dart';
+
+// ViewModels — global (one instance for the lifetime of the app)
+import 'ui/auth/login_viewmodel.dart';
+import 'ui/auth/register_viewmodel.dart';
+import 'ui/home/home_viewmodel.dart';
+import 'ui/debate/start_debate_viewmodel.dart';
+import 'ui/topics/topics_viewmodel.dart';
+import 'ui/progress/progress_viewmodel.dart';
+
+import 'app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  await NotificationService().initialize();
-  runApp(const DebateCoachApp());
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await NotificationDatasource().initialize();
+  runApp(const _AppProviders());
 }
 
-class DebateCoachApp extends StatelessWidget {
-  const DebateCoachApp({super.key});
+class _AppProviders extends StatelessWidget {
+  const _AppProviders();
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'DebateCoach',
-      theme: AppTheme.dark,
-      debugShowCheckedModeBanner: false,
-      home: const AuthWrapper(),
-    );
-  }
-}
+    return MultiProvider(
+      providers: [
+        // --- Remote datasources (plain singletons, not ChangeNotifiers) ---
+        Provider<AIRemoteDatasource>(create: (_) => AIRemoteDatasource()),
+        Provider<WikipediaRemoteDatasource>(
+            create: (_) => WikipediaRemoteDatasource()),
 
-class AuthWrapper extends StatelessWidget {
-  const AuthWrapper({super.key});
+        // --- Repository implementations ---
+        Provider<AuthRepository>(create: (_) => AuthRepositoryImpl()),
+        Provider<DebateRepository>(create: (_) => DebateRepositoryImpl()),
+        Provider<TopicRepository>(create: (_) => TopicRepositoryImpl()),
 
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(color: AppTheme.primary),
-            ),
-          );
-        }
-        if (snapshot.hasData) return const MainScaffold();
-        return const LoginScreen();
-      },
+        // --- Global ViewModels ---
+        ChangeNotifierProxyProvider<AuthRepository, LoginViewModel>(
+          create: (ctx) =>
+              LoginViewModel(repository: ctx.read<AuthRepository>()),
+          update: (_, repo, prev) =>
+              prev ?? LoginViewModel(repository: repo),
+        ),
+        ChangeNotifierProxyProvider<AuthRepository, RegisterViewModel>(
+          create: (ctx) =>
+              RegisterViewModel(repository: ctx.read<AuthRepository>()),
+          update: (_, repo, prev) =>
+              prev ?? RegisterViewModel(repository: repo),
+        ),
+        ChangeNotifierProxyProvider<DebateRepository, HomeViewModel>(
+          create: (ctx) =>
+              HomeViewModel(debateRepository: ctx.read<DebateRepository>()),
+          update: (_, repo, prev) =>
+              prev ?? HomeViewModel(debateRepository: repo),
+        ),
+        ChangeNotifierProxyProvider2<DebateRepository, TopicRepository,
+            StartDebateViewModel>(
+          create: (ctx) => StartDebateViewModel(
+            debateRepository: ctx.read<DebateRepository>(),
+            topicRepository: ctx.read<TopicRepository>(),
+          ),
+          update: (_, debateRepo, topicRepo, prev) =>
+              prev ??
+              StartDebateViewModel(
+                debateRepository: debateRepo,
+                topicRepository: topicRepo,
+              ),
+        ),
+        ChangeNotifierProxyProvider<TopicRepository, TopicsViewModel>(
+          create: (ctx) =>
+              TopicsViewModel(repository: ctx.read<TopicRepository>()),
+          update: (_, repo, prev) =>
+              prev ?? TopicsViewModel(repository: repo),
+        ),
+        ChangeNotifierProvider<ProgressViewModel>(
+            create: (_) => ProgressViewModel()),
+      ],
+      child: const DebateCoachApp(),
     );
   }
 }
