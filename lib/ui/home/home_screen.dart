@@ -3,19 +3,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../domain/model/debate_session.dart';
+import '../../domain/model/topic.dart';
+import '../topics/topics_viewmodel.dart';
 import 'home_viewmodel.dart';
-import '../debate/start_debate_screen.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  final VoidCallback onNavigateToDebate;
 
-  String _timeAgo(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
-    if (diff.inDays > 0) return '${diff.inDays}d ago';
-    if (diff.inHours > 0) return '${diff.inHours}h ago';
-    if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
-    return 'Just now';
-  }
+  const HomeScreen({super.key, required this.onNavigateToDebate});
 
   @override
   Widget build(BuildContext context) {
@@ -26,22 +21,9 @@ class HomeScreen extends StatelessWidget {
       body: CustomScrollView(
         slivers: [
           _buildSliverAppBar(),
-          SliverToBoxAdapter(child: _buildStatsRow()),
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(20, 28, 20, 12),
-              child: Text(
-                'RECENT BATTLES',
-                style: TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ),
-          ),
-          _buildSessionList(context, vm.getRecentSessions(userId)),
+          SliverToBoxAdapter(child: _buildStreakAndGoal(context, vm, userId)),
+          SliverToBoxAdapter(child: _buildFeaturedTopic(context)),
+          SliverToBoxAdapter(child: _buildEnterArenaButton(context)),
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
       ),
@@ -115,230 +97,211 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatsRow() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: Row(
-        children: [
-          _statItem('0', 'Sessions', Icons.gavel),
-          _vDivider(),
-          _statItem('0', 'Day Streak', Icons.local_fire_department),
-          _vDivider(),
-          _statItem('—', 'Avg Score', Icons.trending_up),
-        ],
-      ),
-    );
-  }
-
-  Widget _statItem(String value, String label, IconData icon) {
-    return Expanded(
-      child: Column(
-        children: [
-          Icon(icon, color: AppTheme.primary, size: 20),
-          const SizedBox(height: 6),
-          Text(value,
-              style: const TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800)),
-          const SizedBox(height: 2),
-          Text(label,
-              style: const TextStyle(
-                  color: AppTheme.textSecondary, fontSize: 11)),
-        ],
-      ),
-    );
-  }
-
-  Widget _vDivider() =>
-      Container(width: 1, height: 48, color: AppTheme.divider);
-
-  Widget _buildSessionList(
-      BuildContext context, Stream<List<DebateSession>> stream) {
+  Widget _buildStreakAndGoal(
+      BuildContext context, HomeViewModel vm, String userId) {
     return StreamBuilder<List<DebateSession>>(
-      stream: stream,
+      stream: vm.getRecentSessions(userId),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SliverToBoxAdapter(
-            child: Center(
-              child: Padding(
-                padding: EdgeInsets.all(40),
-                child: CircularProgressIndicator(
-                    color: AppTheme.primary, strokeWidth: 2),
+        final sessions = snapshot.data ?? [];
+        final thisWeek = sessions.where((s) {
+          final diff = DateTime.now().difference(s.createdAt).inDays;
+          return diff < 7;
+        }).length;
+        const weeklyGoal = 5;
+        final progress = (thisWeek / weeklyGoal).clamp(0.0, 1.0);
+
+        return Container(
+          margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.local_fire_department,
+                      color: AppTheme.secondary, size: 22),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'STREAK',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${sessions.length} total sessions',
+                    style: const TextStyle(
+                        color: AppTheme.textSecondary, fontSize: 11),
+                  ),
+                ],
               ),
-            ),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return SliverToBoxAdapter(child: _buildFirebaseError());
-        }
-
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return SliverToBoxAdapter(child: _buildEmptyState(context));
-        }
-
-        final sessions = snapshot.data!;
-        return SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, i) => _buildSessionCard(sessions[i]),
-            childCount: sessions.length,
+              const SizedBox(height: 6),
+              Text(
+                '0 days',
+                style: const TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'WEEKLY GOAL',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  Text(
+                    '$thisWeek / $weeklyGoal debates',
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 8,
+                  backgroundColor: AppTheme.surfaceVar,
+                  valueColor:
+                      const AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                ),
+              ),
+            ],
           ),
         );
       },
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      child: Column(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-              border:
-                  Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
-            ),
-            child: const Icon(Icons.gavel, color: AppTheme.primary, size: 36),
-          ),
-          const SizedBox(height: 20),
-          const Text('Your first battle awaits.',
-              style: TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          const Text(
-            'Step into the arena and start your first debate.\nThe AI opponent is ready.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                color: AppTheme.textSecondary, fontSize: 14, height: 1.5),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const StartDebateScreen()),
-            ),
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('START A DEBATE'),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildFeaturedTopic(BuildContext context) {
+    return StreamBuilder<List<Topic>>(
+      stream: context.read<TopicsViewModel>().topicsStream,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        final topic = snapshot.data!.first;
 
-  Widget _buildFirebaseError() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: AppTheme.secondary.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.warning_amber_rounded,
-                color: AppTheme.secondary, size: 32),
+        return Container(
+          margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.border),
           ),
-          const SizedBox(height: 16),
-          const Text('Firebase Not Configured',
-              style: TextStyle(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.secondary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'FEATURED TOPIC',
+                      style: TextStyle(
+                        color: AppTheme.secondary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                topic.title,
+                style: const TextStyle(
                   color: AppTheme.textPrimary,
                   fontSize: 16,
-                  fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          const Text(
-            'Run "flutterfire configure" and add\ngoogle-services.json to enable Firestore.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                color: AppTheme.textSecondary, fontSize: 13, height: 1.5),
+                  fontWeight: FontWeight.w700,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _chip(topic.category, AppTheme.textSecondary,
+                      AppTheme.surfaceVar),
+                  const SizedBox(width: 8),
+                  _chip(
+                    topic.difficulty.toUpperCase(),
+                    _diffColor(topic.difficulty),
+                    _diffColor(topic.difficulty).withValues(alpha: 0.1),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildSessionCard(DebateSession session) {
-    final isPro = session.stance == 'pro';
-    final stanceColor = isPro ? AppTheme.proColor : AppTheme.conColor;
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(14),
-        leading: Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            color: stanceColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: stanceColor.withValues(alpha: 0.4)),
-          ),
-          child: Center(
-            child: Text(
-              isPro ? 'PRO' : 'CON',
-              style: TextStyle(
-                color: stanceColor,
-                fontWeight: FontWeight.w800,
-                fontSize: 11,
-                letterSpacing: 0.5,
-              ),
+  Widget _buildEnterArenaButton(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: onNavigateToDebate,
+          icon: const Icon(Icons.gavel, size: 20),
+          label: const Text(
+            'ENTER THE ARENA',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.5,
             ),
           ),
-        ),
-        title: Text(
-          session.topicTitle,
-          style: const TextStyle(
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.w600,
-              fontSize: 13),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            _timeAgo(session.createdAt),
-            style:
-                const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 18),
           ),
         ),
-        trailing: session.score > 0
-            ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '${session.score}',
-                    style: const TextStyle(
-                        color: AppTheme.secondary,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800),
-                  ),
-                  const Text('pts',
-                      style: TextStyle(
-                          color: AppTheme.textSecondary, fontSize: 11)),
-                ],
-              )
-            : const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
       ),
     );
   }
+
+  Widget _chip(String label, Color textColor, Color bgColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration:
+          BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(6)),
+      child: Text(label,
+          style: TextStyle(
+              color: textColor, fontSize: 11, fontWeight: FontWeight.w600)),
+    );
+  }
+
+  Color _diffColor(String difficulty) => switch (difficulty) {
+        'easy' => AppTheme.proColor,
+        'hard' => AppTheme.conColor,
+        _ => AppTheme.secondary,
+      };
 }
