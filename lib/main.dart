@@ -13,11 +13,13 @@ import 'data/remote/notification_datasource.dart';
 import 'data/repository/auth_repository_impl.dart';
 import 'data/repository/debate_repository_impl.dart';
 import 'data/repository/topic_repository_impl.dart';
+import 'data/repository/progress_repository_impl.dart';
 
 // Domain — repository interfaces (used as provider keys)
 import 'domain/repository/auth_repository.dart';
 import 'domain/repository/debate_repository.dart';
 import 'domain/repository/topic_repository.dart';
+import 'domain/repository/progress_repository.dart';
 
 // ViewModels — global (one instance for the lifetime of the app)
 import 'ui/auth/login_viewmodel.dart';
@@ -66,6 +68,7 @@ class _AppProviders extends StatelessWidget {
         Provider<AuthRepository>(create: (_) => AuthRepositoryImpl()),
         Provider<DebateRepository>(create: (_) => DebateRepositoryImpl()),
         Provider<TopicRepository>(create: (_) => TopicRepositoryImpl()),
+        Provider<ProgressRepository>(create: (_) => ProgressRepositoryImpl()),
 
         // --- Global ViewModels ---
         ChangeNotifierProxyProvider<AuthRepository, LoginViewModel>(
@@ -105,8 +108,12 @@ class _AppProviders extends StatelessWidget {
           update: (_, repo, prev) =>
               prev ?? TopicsViewModel(repository: repo),
         ),
-        ChangeNotifierProvider<ProgressViewModel>(
-            create: (_) => ProgressViewModel()),
+        ChangeNotifierProxyProvider<ProgressRepository, ProgressViewModel>(
+          create: (ctx) => ProgressViewModel(
+              repository: ctx.read<ProgressRepository>()),
+          update: (_, repo, prev) =>
+              prev ?? ProgressViewModel(repository: repo),
+        ),
       ],
       child: const DebateCoachApp(),
     );

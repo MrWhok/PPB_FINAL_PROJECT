@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../../domain/model/message.dart';
+import '../../domain/repository/progress_repository.dart';
 import '../../data/remote/notification_datasource.dart';
 import '../../theme/app_theme.dart';
 import 'debate_chat_viewmodel.dart';
@@ -199,6 +201,8 @@ class _DebateChatScreenState extends State<DebateChatScreen> {
     );
 
     final vm = context.read<DebateChatViewModel>();
+    final progressRepo = context.read<ProgressRepository>();
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     try {
       final result = await vm.endSession(
         messages: _messages,
@@ -207,8 +211,13 @@ class _DebateChatScreenState extends State<DebateChatScreen> {
       if (!mounted) return;
       Navigator.pop(context);
 
-      // Notification #1 — Score Ready (always fires)
+      // C CRUD for Person C — auto-create/update progress doc after session
       final score = result['score'] as int;
+      if (uid.isNotEmpty) {
+        progressRepo.upsertAfterSession(userId: uid, score: score);
+      }
+
+      // Notification #1 — Score Ready (always fires)
       final notif = NotificationDatasource();
       await notif.showScoreReady(score, vm.session.topicTitle);
       // Notification #3 — High Score (only when score >= 8)
