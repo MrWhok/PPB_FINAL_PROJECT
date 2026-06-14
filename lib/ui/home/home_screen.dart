@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../domain/model/debate_session.dart';
@@ -24,6 +25,7 @@ class HomeScreen extends StatelessWidget {
           SliverToBoxAdapter(child: _buildStreakAndGoal(context, vm, userId)),
           SliverToBoxAdapter(child: _buildFeaturedTopic(context)),
           SliverToBoxAdapter(child: _buildEnterArenaButton(context)),
+          SliverToBoxAdapter(child: _buildTestCrashButton(context)),
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
       ),
@@ -283,6 +285,27 @@ class HomeScreen extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 18),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTestCrashButton(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: OutlinedButton.icon(
+        onPressed: () async {
+          await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
+          FirebaseCrashlytics.instance.crash();
+        },
+        icon: const Icon(Icons.bug_report, size: 16, color: Colors.red),
+        label: const Text(
+          'TEST CRASH (remove after testing)',
+          style: TextStyle(color: Colors.red, fontSize: 12),
+        ),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: Colors.red),
+          padding: const EdgeInsets.symmetric(vertical: 10),
         ),
       ),
     );
