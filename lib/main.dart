@@ -1,6 +1,9 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:provider/provider.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
 import 'firebase_options.dart';
 
 // Data layer
@@ -29,7 +32,21 @@ import 'app.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await NotificationDatasource().initialize();
+
+  // Crashlytics — catch Flutter framework errors
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+  // Catch async errors outside Flutter (e.g. isolates, platform channels)
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
+
+  // Timezone data needed for scheduled notifications
+  tz.initializeTimeZones();
+
+  final notif = NotificationDatasource();
+  await notif.initialize();
+  await notif.scheduleDailyReminder(); // #5 — fires every day at 8 PM
   runApp(const _AppProviders());
 }
 
