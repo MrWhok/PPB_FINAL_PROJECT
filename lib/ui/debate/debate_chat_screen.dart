@@ -4,6 +4,7 @@ import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../../domain/model/message.dart';
+import '../../data/remote/notification_datasource.dart';
 import '../../theme/app_theme.dart';
 import 'debate_chat_viewmodel.dart';
 
@@ -205,6 +206,15 @@ class _DebateChatScreenState extends State<DebateChatScreen> {
       );
       if (!mounted) return;
       Navigator.pop(context);
+
+      // Notification #1 — Score Ready (always fires)
+      final score = result['score'] as int;
+      final notif = NotificationDatasource();
+      await notif.showScoreReady(score, vm.session.topicTitle);
+      // Notification #3 — High Score (only when score >= 8)
+      if (score >= 8) await notif.showHighScore(score);
+
+      if (!mounted) return;
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -959,58 +969,60 @@ class _SessionSummaryDialog extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         side: const BorderSide(color: AppTheme.border),
       ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: scoreColor.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-              border:
-                  Border.all(color: scoreColor.withValues(alpha: 0.4)),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: scoreColor.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+                border:
+                    Border.all(color: scoreColor.withValues(alpha: 0.4)),
+              ),
+              child: Center(
+                child: Text('$score',
+                    style: TextStyle(
+                        color: scoreColor,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900)),
+              ),
             ),
-            child: Center(
-              child: Text('$score',
-                  style: TextStyle(
-                      color: scoreColor,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900)),
+            const SizedBox(height: 16),
+            const Text('DEBATE COMPLETE',
+                style: TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.5)),
+            const SizedBox(height: 16),
+            _statRow('Score', '$score / 10', scoreColor),
+            _statRow('Stance', stance.toUpperCase(), stanceColor),
+            _statRow('Arguments made', '$messageCount', AppTheme.textPrimary),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceVar,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Text('"$feedback"',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      height: 1.5)),
             ),
-          ),
-          const SizedBox(height: 16),
-          const Text('DEBATE COMPLETE',
-              style: TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.5)),
-          const SizedBox(height: 16),
-          _statRow('Score', '$score / 10', scoreColor),
-          _statRow('Stance', stance.toUpperCase(), stanceColor),
-          _statRow('Arguments made', '$messageCount', AppTheme.textPrimary),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceVar,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppTheme.border),
-            ),
-            child: Text('"$feedback"',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                    height: 1.5)),
-          ),
-          const SizedBox(height: 8),
-          const Text('Score & feedback saved to Firestore ✓',
-              style:
-                  TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
-        ],
+            const SizedBox(height: 8),
+            const Text('Score & feedback saved to Firestore ✓',
+                style:
+                    TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+          ],
+        ),
       ),
       actions: [
         SizedBox(

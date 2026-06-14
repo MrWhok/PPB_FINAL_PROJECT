@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../domain/model/debate_session.dart';
+import '../../data/remote/notification_datasource.dart';
 import '../home/home_viewmodel.dart';
 
 class ProgressScreen extends StatelessWidget {
@@ -60,7 +61,8 @@ class ProgressScreen extends StatelessWidget {
               else
                 SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (context, i) => _buildSessionCard(sessions[i]),
+                    (context, i) =>
+                        _buildSwipeableCard(context, sessions[i]),
                     childCount: sessions.length,
                   ),
                 ),
@@ -126,6 +128,67 @@ class ProgressScreen extends StatelessWidget {
 
   Widget _vDivider() =>
       Container(width: 1, height: 44, color: AppTheme.divider);
+
+  Widget _buildSwipeableCard(BuildContext context, DebateSession session) {
+    return Dismissible(
+      key: Key(session.sessionId),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Delete Session?'),
+            content: Text(
+                'Delete "${session.topicTitle}"? This also removes all messages and cannot be undone.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Delete',
+                    style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+        );
+      },
+      onDismissed: (_) {
+        context.read<HomeViewModel>().deleteSession(session.sessionId);
+        NotificationDatasource().showSessionDeleted(session.topicTitle);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('"${session.topicTitle}" deleted.'),
+            action: SnackBarAction(label: 'OK', onPressed: () {}),
+          ),
+        );
+      },
+      background: Container(
+        margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.delete_rounded, color: Colors.white, size: 24),
+            SizedBox(height: 4),
+            Text('DELETE',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1)),
+          ],
+        ),
+      ),
+      child: _buildSessionCard(session),
+    );
+  }
 
   Widget _buildSessionCard(DebateSession session) {
     final isPro = session.stance == 'pro';

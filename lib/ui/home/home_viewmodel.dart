@@ -14,4 +14,7 @@ class HomeViewModel extends ChangeNotifier {
     _sessionsStream ??= _debateRepository.getUserSessions(userId);
     return _sessionsStream!;
   }
+
+  Future<void> deleteSession(String sessionId) =>
+      _debateRepository.deleteSession(sessionId);
 }
