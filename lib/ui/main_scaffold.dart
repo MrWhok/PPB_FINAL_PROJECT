@@ -15,19 +15,21 @@ class MainScaffold extends StatefulWidget {
 class _MainScaffoldState extends State<MainScaffold> {
   int _currentIndex = 0;
 
-  static const _screens = [
-    HomeScreen(),
-    StartDebateScreen(),
-    TopicsScreen(),
-    ProgressScreen(),
-  ];
+  void _goToDebate() => setState(() => _currentIndex = 1);
 
   @override
   Widget build(BuildContext context) {
+    final screens = [
+      HomeScreen(onNavigateToDebate: _goToDebate),
+      const StartDebateScreen(),
+      const TopicsScreen(),
+      const ProgressScreen(),
+    ];
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: screens,
       ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
