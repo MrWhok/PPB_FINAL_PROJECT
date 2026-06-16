@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import '../../config/secrets.dart';
 
@@ -29,7 +31,7 @@ class WikipediaRemoteDatasource {
           'max_tokens': 15,
           'temperature': 0.1,
         }),
-      );
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -38,6 +40,10 @@ class WikipediaRemoteDatasource {
           return keyword;
         }
       }
+    } on SocketException {
+      rethrow;
+    } on TimeoutException {
+      rethrow;
     } catch (_) {}
     return topicTitle;
   }
@@ -52,7 +58,7 @@ class WikipediaRemoteDatasource {
 
       final searchUrl = Uri.parse(
           'https://id.wikipedia.org/w/api.php?action=query&list=search&srsearch=${Uri.encodeComponent(keyword)}&utf8=&format=json');
-      final searchResponse = await http.get(searchUrl);
+      final searchResponse = await http.get(searchUrl).timeout(const Duration(seconds: 10));
 
       if (searchResponse.statusCode == 200) {
         final searchData = jsonDecode(searchResponse.body);
@@ -62,7 +68,7 @@ class WikipediaRemoteDatasource {
           final bestMatchTitle = searchResults.first['title'];
           final summaryUrl = Uri.parse(
               'https://id.wikipedia.org/api/rest_v1/page/summary/${Uri.encodeComponent(bestMatchTitle)}');
-          final summaryResponse = await http.get(summaryUrl);
+          final summaryResponse = await http.get(summaryUrl).timeout(const Duration(seconds: 10));
 
           if (summaryResponse.statusCode == 200) {
             final summaryData = jsonDecode(summaryResponse.body);
@@ -73,6 +79,10 @@ class WikipediaRemoteDatasource {
         }
       }
       return null;
+    } on SocketException {
+      rethrow;
+    } on TimeoutException {
+      rethrow;
     } catch (_) {
       return null;
     }

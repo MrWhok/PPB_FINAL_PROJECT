@@ -99,15 +99,26 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Failed to fetch background context from Wikipedia or page not found.',
-            style: TextStyle(color: Colors.red),
+          Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  vm.errorMessage ?? 'Failed to fetch background context.',
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           TextButton.icon(
             onPressed: () => context.read<TopicDetailViewModel>().fetchSummary(),
             icon: const Icon(Icons.refresh),
             label: const Text('Retry'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppTheme.primary,
+            ),
           ),
         ],
       );
