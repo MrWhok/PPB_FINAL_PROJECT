@@ -14,12 +14,16 @@ import 'data/repository/auth_repository_impl.dart';
 import 'data/repository/debate_repository_impl.dart';
 import 'data/repository/topic_repository_impl.dart';
 import 'data/repository/progress_repository_impl.dart';
+import 'data/repository/quiz_repository_impl.dart';
+import 'data/repository/profile_repository_impl.dart';
 
 // Domain — repository interfaces (used as provider keys)
 import 'domain/repository/auth_repository.dart';
 import 'domain/repository/debate_repository.dart';
 import 'domain/repository/topic_repository.dart';
 import 'domain/repository/progress_repository.dart';
+import 'domain/repository/quiz_repository.dart';
+import 'domain/repository/profile_repository.dart';
 
 // ViewModels — global (one instance for the lifetime of the app)
 import 'ui/auth/login_viewmodel.dart';
@@ -69,25 +73,27 @@ class _AppProviders extends StatelessWidget {
         Provider<DebateRepository>(create: (_) => DebateRepositoryImpl()),
         Provider<TopicRepository>(create: (_) => TopicRepositoryImpl()),
         Provider<ProgressRepository>(create: (_) => ProgressRepositoryImpl()),
+        Provider<QuizRepository>(create: (_) => QuizRepositoryImpl()),
+        Provider<ProfileRepository>(create: (_) => ProfileRepositoryImpl()),
 
         // --- Global ViewModels ---
         ChangeNotifierProxyProvider<AuthRepository, LoginViewModel>(
           create: (ctx) =>
               LoginViewModel(repository: ctx.read<AuthRepository>()),
           update: (_, repo, prev) =>
-              prev ?? LoginViewModel(repository: repo),
+          prev ?? LoginViewModel(repository: repo),
         ),
         ChangeNotifierProxyProvider<AuthRepository, RegisterViewModel>(
           create: (ctx) =>
               RegisterViewModel(repository: ctx.read<AuthRepository>()),
           update: (_, repo, prev) =>
-              prev ?? RegisterViewModel(repository: repo),
+          prev ?? RegisterViewModel(repository: repo),
         ),
         ChangeNotifierProxyProvider<DebateRepository, HomeViewModel>(
           create: (ctx) =>
               HomeViewModel(debateRepository: ctx.read<DebateRepository>()),
           update: (_, repo, prev) =>
-              prev ?? HomeViewModel(debateRepository: repo),
+          prev ?? HomeViewModel(debateRepository: repo),
         ),
         ChangeNotifierProxyProvider2<DebateRepository, TopicRepository,
             StartDebateViewModel>(
@@ -96,7 +102,7 @@ class _AppProviders extends StatelessWidget {
             topicRepository: ctx.read<TopicRepository>(),
           ),
           update: (_, debateRepo, topicRepo, prev) =>
-              prev ??
+          prev ??
               StartDebateViewModel(
                 debateRepository: debateRepo,
                 topicRepository: topicRepo,
@@ -106,13 +112,13 @@ class _AppProviders extends StatelessWidget {
           create: (ctx) =>
               TopicsViewModel(repository: ctx.read<TopicRepository>()),
           update: (_, repo, prev) =>
-              prev ?? TopicsViewModel(repository: repo),
+          prev ?? TopicsViewModel(repository: repo),
         ),
         ChangeNotifierProxyProvider<ProgressRepository, ProgressViewModel>(
           create: (ctx) => ProgressViewModel(
               repository: ctx.read<ProgressRepository>()),
           update: (_, repo, prev) =>
-              prev ?? ProgressViewModel(repository: repo),
+          prev ?? ProgressViewModel(repository: repo),
         ),
       ],
       child: const DebateCoachApp(),

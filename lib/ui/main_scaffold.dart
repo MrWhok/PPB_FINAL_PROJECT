@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import 'home/home_screen.dart';
 import 'debate/start_debate_screen.dart';
 import 'topics/topics_screen.dart';
 import 'progress/progress_screen.dart';
+import 'quiz/quiz_hub_screen.dart';
+import 'quiz/quiz_history_viewmodel.dart';
+import '../domain/repository/quiz_repository.dart';
 import '../theme/app_theme.dart';
 
 class MainScaffold extends StatefulWidget {
@@ -19,10 +24,18 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   @override
   Widget build(BuildContext context) {
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
     final screens = [
       HomeScreen(onNavigateToDebate: _goToDebate),
       const StartDebateScreen(),
       const TopicsScreen(),
+      ChangeNotifierProvider(
+        create: (ctx) => QuizHistoryViewModel(
+          repository: ctx.read<QuizRepository>(),
+          userId: userId,
+        ),
+        child: QuizHubScreen(userId: userId),
+      ),
       const ProgressScreen(),
     ];
 
@@ -53,6 +66,11 @@ class _MainScaffoldState extends State<MainScaffold> {
               icon: Icon(Icons.library_books_outlined),
               activeIcon: Icon(Icons.library_books),
               label: 'Topics',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.quiz_outlined),
+              activeIcon: Icon(Icons.quiz),
+              label: 'Quiz',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.trending_up_outlined),

@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../domain/repository/auth_repository.dart';
 
@@ -46,6 +47,23 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> signOut() async {
     await GoogleSignIn().signOut();
     await _auth.signOut();
+  }
+
+  @override
+  Future<void> deleteProfilePhoto() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    // Remove from Firebase Storage (ignore if file doesn't exist)
+    try {
+      await FirebaseStorage.instance
+          .ref('profile_photos/${user.uid}.jpg')
+          .delete();
+    } catch (_) {}
+
+    // Clear URL in Firestore and Firebase Auth
+    await _firestore.collection('users').doc(user.uid).update({'photoURL': ''});
+    await user.updatePhotoURL('');
   }
 
   @override

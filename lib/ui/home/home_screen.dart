@@ -6,6 +6,9 @@ import '../../theme/app_theme.dart';
 import '../../domain/model/debate_session.dart';
 import '../../domain/model/topic.dart';
 import '../topics/topics_viewmodel.dart';
+import '../profile/profile_screen.dart';
+import '../profile/profile_viewmodel.dart';
+import '../../domain/repository/profile_repository.dart';
 import 'home_viewmodel.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -21,7 +24,7 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          _buildSliverAppBar(),
+          _buildSliverAppBar(context),
           SliverToBoxAdapter(child: _buildStreakAndGoal(context, vm, userId)),
           SliverToBoxAdapter(child: _buildFeaturedTopic(context)),
           SliverToBoxAdapter(child: _buildEnterArenaButton(context)),
@@ -32,10 +35,47 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSliverAppBar() {
+  ImageProvider? _avatarImage() {
+    final url = FirebaseAuth.instance.currentUser?.photoURL ?? '';
+    return url.isNotEmpty ? NetworkImage(url) : null;
+  }
+
+  void _openProfile(BuildContext context) {
+    final repo = context.read<ProfileRepository>();
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChangeNotifierProvider(
+          create: (_) =>
+          ProfileViewModel(repository: repo, uid: uid)..load(),
+          child: const ProfileScreen(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSliverAppBar(BuildContext context) {
     return SliverAppBar(
       expandedHeight: 180,
       pinned: true,
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 12, top: 4),
+          child: GestureDetector(
+            onTap: () => _openProfile(context),
+            child: CircleAvatar(
+              radius: 18,
+              backgroundColor: AppTheme.surfaceVar,
+              backgroundImage: _avatarImage(),
+              child: _avatarImage() == null
+                  ? const Icon(Icons.person,
+                  size: 20, color: AppTheme.textSecondary)
+                  : null,
+            ),
+          ),
+        ),
+      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           fit: StackFit.expand,
@@ -185,7 +225,7 @@ class HomeScreen extends StatelessWidget {
                   minHeight: 8,
                   backgroundColor: AppTheme.surfaceVar,
                   valueColor:
-                      const AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                  const AlwaysStoppedAnimation<Color>(AppTheme.primary),
                 ),
               ),
             ],
@@ -315,7 +355,7 @@ class HomeScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration:
-          BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(6)),
+      BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(6)),
       child: Text(label,
           style: TextStyle(
               color: textColor, fontSize: 11, fontWeight: FontWeight.w600)),
@@ -323,8 +363,8 @@ class HomeScreen extends StatelessWidget {
   }
 
   Color _diffColor(String difficulty) => switch (difficulty) {
-        'easy' => AppTheme.proColor,
-        'hard' => AppTheme.conColor,
-        _ => AppTheme.secondary,
-      };
+    'easy' => AppTheme.proColor,
+    'hard' => AppTheme.conColor,
+    _ => AppTheme.secondary,
+  };
 }

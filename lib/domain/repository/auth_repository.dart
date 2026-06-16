@@ -9,4 +9,5 @@ abstract interface class AuthRepository {
   Future<void> signOut();
   Future<Map<String, dynamic>?> getUserProfile();
   Future<void> updateProfile({String? name, String? phoneNumber, String? photoURL});
+  Future<void> deleteProfilePhoto();
 }
