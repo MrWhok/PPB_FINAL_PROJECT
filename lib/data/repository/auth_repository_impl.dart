@@ -48,6 +48,31 @@ class AuthRepositoryImpl implements AuthRepository {
     await _auth.signOut();
   }
 
+  @override
+  Future<Map<String, dynamic>?> getUserProfile() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return null;
+    final doc = await _firestore.collection('users').doc(uid).get();
+    return doc.exists ? doc.data() : null;
+  }
+
+  @override
+  Future<void> updateProfile({String? name, String? phoneNumber, String? photoURL}) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    final updates = <String, dynamic>{};
+    if (name != null) updates['name'] = name;
+    if (phoneNumber != null) updates['phoneNumber'] = phoneNumber;
+    if (photoURL != null) updates['photoURL'] = photoURL;
+
+    if (updates.isNotEmpty) {
+      await _firestore.collection('users').doc(uid).update(updates);
+    }
+    if (name != null) await _auth.currentUser?.updateDisplayName(name);
+    if (photoURL != null) await _auth.currentUser?.updatePhotoURL(photoURL);
+  }
+
   Future<void> _saveUserToFirestore({
     required String uid,
     required String name,
@@ -61,6 +86,7 @@ class AuthRepositoryImpl implements AuthRepository {
         'name': name,
         'email': email,
         'photoURL': photoURL,
+        'phoneNumber': '',
         'goal': '',
         'createdAt': FieldValue.serverTimestamp(),
       },
