@@ -127,13 +127,61 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(vm.summary!, style: const TextStyle(fontSize: 15, height: 1.5)),
-        const SizedBox(height: 12),
-        const Text(
-          'Source: id.wikipedia.org',
-          style: TextStyle(
-              fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey),
+        // AI Coach Context Section
+        const Row(
+          children: [
+            Icon(Icons.auto_awesome, color: Colors.purple, size: 18),
+            SizedBox(width: 6),
+            Text(
+              'AI Coach Context',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.purple,
+              ),
+            ),
+          ],
         ),
+        const SizedBox(height: 8),
+        Text(vm.aiPolishedSummary ?? '', style: const TextStyle(fontSize: 15, height: 1.5)),
+        const SizedBox(height: 16),
+        const Divider(),
+        const SizedBox(height: 8),
+        
+        // Wikipedia Source Section
+        const Row(
+          children: [
+            Icon(Icons.public, color: Colors.grey, size: 16),
+            SizedBox(width: 6),
+            Text(
+              'Original Wikipedia Extract',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        if (vm.wikipediaSummary != null) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              vm.wikipediaSummary!,
+              style: const TextStyle(fontSize: 13, height: 1.4, color: Colors.grey),
+            ),
+          ),
+        ] else ...[
+          const Text(
+            'No matching Wikipedia article found. Context generated purely by AI.',
+            style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey),
+          ),
+        ],
       ],
     );
   }
