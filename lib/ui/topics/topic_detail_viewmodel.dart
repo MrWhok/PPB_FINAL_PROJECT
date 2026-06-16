@@ -13,7 +13,8 @@ class TopicDetailViewModel extends ChangeNotifier {
     required WikipediaRemoteDatasource datasource,
   }) : _datasource = datasource;
 
-  String? summary;
+  String? wikipediaSummary;
+  String? aiPolishedSummary;
   bool isLoading = true;
   String? errorMessage; // Replaces hasError boolean
 
@@ -25,19 +26,25 @@ class TopicDetailViewModel extends ChangeNotifier {
     notifyListeners();
     
     try {
-      summary = await _datasource.getSummary(topicTitle);
-      if (summary == null || summary!.isEmpty) {
-        errorMessage = 'Failed to fetch background context from Wikipedia or page not found.';
+      final result = await _datasource.getBackgroundContext(topicTitle);
+      if (result == null) {
+        errorMessage = 'Failed to generate background context or find relevant information.';
+      } else {
+        wikipediaSummary = result.wikipediaExtract;
+        aiPolishedSummary = result.aiPolishedContext;
       }
     } on SocketException {
       errorMessage = 'No internet connection. Please check your network and try again.';
-      summary = null;
+      wikipediaSummary = null;
+      aiPolishedSummary = null;
     } on TimeoutException {
       errorMessage = 'Connection timed out. The server took too long to respond.';
-      summary = null;
+      wikipediaSummary = null;
+      aiPolishedSummary = null;
     } catch (e) {
       errorMessage = 'An unexpected error occurred: $e';
-      summary = null;
+      wikipediaSummary = null;
+      aiPolishedSummary = null;
     }
 
     isLoading = false;
