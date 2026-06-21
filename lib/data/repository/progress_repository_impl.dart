@@ -87,10 +87,19 @@ class ProgressRepositoryImpl implements ProgressRepository {
 
   @override
   Future<void> removeScore({required String userId, required int score}) async {
-    await _db.collection(_col).doc(userId).update({
-      'scores': FieldValue.arrayRemove([score]),
-      'totalSessions': FieldValue.increment(-1),
-      'updatedAt': Timestamp.fromDate(DateTime.now()),
+    final ref = _db.collection(_col).doc(userId);
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+      final scores = List<int>.from(snap.data()!['scores'] as List? ?? []);
+      final idx = scores.indexOf(score);
+      if (idx != -1) scores.removeAt(idx);
+      final currentTotal = snap.data()!['totalSessions'] as int? ?? 1;
+      tx.update(ref, {
+        'scores': scores,
+        'totalSessions': (currentTotal - 1).clamp(0, currentTotal),
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      });
     });
   }
 

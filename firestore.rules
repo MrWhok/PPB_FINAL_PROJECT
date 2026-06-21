@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Each user can read/write only their own profile document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Debate sessions — any authenticated user can create;
+    // only the owner can read/update/delete
+    match /debateSessions/{sessionId} {
+      allow read, update, delete: if request.auth != null
+                                  && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.userId;
+
+      // Messages subcollection follows the parent session's owner
+      match /messages/{messageId} {
+        allow read, write: if request.auth != null
+                           && request.auth.uid == get(/databases/$(database)/documents/debateSessions/$(sessionId)).data.userId;
+      }
+    }
+
+    // Topics — all authenticated users can read, create, update, delete
+    match /topics/{topicId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Progress — each user can read/write only their own progress document
+    match /progress/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Quiz questions — all authenticated users can read;
+    // write only allowed (for seeding) by authenticated users
+    match /quizQuestions/{questionId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // Quiz attempts — only the owner can read/write their own attempts
+    match /quizAttempts/{attemptId} {
+      allow read, update, delete: if request.auth != null
+                                  && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.userId;
+    }
+  }
+}
