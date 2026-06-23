@@ -41,25 +41,29 @@ class UserProfile {
       );
 
   /// Only the user-editable fields, for a Firestore update.
+  /// Catatan: di Firestore field-nya bernama `phoneNumber` agar konsisten
+  /// dengan dokumen yang dibuat AuthRepository saat registrasi.
   Map<String, dynamic> toUpdateMap() => {
-        'name': name,
-        'photoURL': photoURL,
-        'goal': goal,
-        'bio': bio,
-        'phone': phone,
-        'address': address,
-      };
+    'name': name,
+    'photoURL': photoURL,
+    'goal': goal,
+    'bio': bio,
+    'phoneNumber': phone,
+    'address': address,
+  };
 
   factory UserProfile.fromMap(Map<String, dynamic> map) => UserProfile(
-        uid: map['uid'] as String? ?? '',
-        name: map['name'] as String? ?? '',
-        email: map['email'] as String? ?? '',
-        photoURL: map['photoURL'] as String? ?? '',
-        goal: map['goal'] as String? ?? '',
-        bio: map['bio'] as String? ?? '',
-        phone: map['phone'] as String? ?? '',
-        address: map['address'] as String? ?? '',
-      );
+    uid: map['uid'] as String? ?? '',
+    name: map['name'] as String? ?? '',
+    email: map['email'] as String? ?? '',
+    photoURL: map['photoURL'] as String? ?? '',
+    goal: map['goal'] as String? ?? '',
+    bio: map['bio'] as String? ?? '',
+    // baca `phoneNumber` (utama) atau `phone` (kompatibilitas lama)
+    phone:
+    map['phoneNumber'] as String? ?? map['phone'] as String? ?? '',
+    address: map['address'] as String? ?? '',
+  );
 
   factory UserProfile.fromDoc(DocumentSnapshot doc) =>
       UserProfile.fromMap(doc.data() as Map<String, dynamic>);

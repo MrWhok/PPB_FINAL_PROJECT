@@ -2,13 +2,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../domain/repository/quiz_repository.dart';
 import '../../domain/model/quiz_question.dart';
 import '../../domain/model/quiz_attempt.dart';
+import '../remote/quiz_remote_datasource.dart';
 
 class QuizRepositoryImpl implements QuizRepository {
   final _firestore = FirebaseFirestore.instance;
+  final QuizRemoteDatasource _remote = QuizRemoteDatasource();
   static const _questions = 'quizQuestions';
   static const _attempts = 'quizAttempts';
 
-  // ---------------- Questions ----------------
+  // ---------------- Questions: AI ----------------
+  @override
+  Future<List<QuizQuestion>> generateQuestions({
+    required String category,
+    int count = 5,
+  }) {
+    return _remote.generate(category: category, count: count);
+  }
+
+  // ---------------- Questions: seed bank (opsional) ----------------
   @override
   Stream<List<QuizQuestion>> getQuestions() {
     return _firestore.collection(_questions).snapshots().map((snapshot) =>
@@ -46,13 +57,18 @@ class QuizRepositoryImpl implements QuizRepository {
 
   @override
   Stream<List<QuizAttempt>> watchAttempts(String userId) {
+    // Hanya filter userId (tanpa orderBy) supaya TIDAK butuh composite index.
+    // Pengurutan terbaru-dulu dilakukan di sisi klien.
     return _firestore
         .collection(_attempts)
         .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => QuizAttempt.fromDoc(doc)).toList());
+        .map((snapshot) {
+      final list =
+      snapshot.docs.map((doc) => QuizAttempt.fromDoc(doc)).toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    });
   }
 
   @override

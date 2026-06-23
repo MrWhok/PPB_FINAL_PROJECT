@@ -3,8 +3,8 @@ import '../../domain/model/quiz_question.dart';
 import '../../domain/model/quiz_attempt.dart';
 import '../../domain/repository/quiz_repository.dart';
 
-/// Drives a single quiz session: loads questions, tracks the user's answers,
-/// computes the score, and persists the attempt to Firestore.
+/// Drives a single quiz session: generates questions via AI, tracks the
+/// user's answers, computes the score, and persists the attempt to Firestore.
 class QuizViewModel extends ChangeNotifier {
   final QuizRepository _repository;
   final String userId;
@@ -49,7 +49,7 @@ class QuizViewModel extends ChangeNotifier {
   int? selectedFor(int index) =>
       (_answers[index] == -1) ? null : _answers[index];
 
-  /// Loads the quiz. [category] == 'Mixed' loads all categories.
+  /// Generates an AI quiz. [category] == 'Mixed' mixes all categories.
   Future<void> loadQuiz({String category = 'Mixed', int limit = 5}) async {
     _isLoading = true;
     _error = null;
@@ -59,19 +59,18 @@ class QuizViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final all = await _repository.getQuestions().first;
-      var pool = category == 'Mixed'
-          ? all
-          : all.where((q) => q.category == category).toList();
-      pool.shuffle();
-      _questions = pool.take(limit).toList();
+      final generated =
+      await _repository.generateQuestions(category: category, count: limit);
+      _questions = generated.take(limit).toList();
       _answers = List<int>.filled(_questions.length, -1);
 
       if (_questions.isEmpty) {
-        _error = 'No questions found. Ask an admin to seed the quiz bank.';
+        _error = 'AI tidak menghasilkan soal. Coba lagi.';
       }
     } catch (e) {
-      _error = 'Failed to load quiz: $e';
+      _error = 'Gagal membuat kuis (cek koneksi/API key): $e';
+      _questions = [];
+      _answers = [];
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -99,7 +98,7 @@ class QuizViewModel extends ChangeNotifier {
   }
 
   bool get isLastQuestion => _currentIndex == _questions.length - 1;
-  bool get allAnswered => !_answers.contains(-1);
+  bool get allAnswered => _answers.isNotEmpty && !_answers.contains(-1);
 
   /// Marks the quiz finished and saves the attempt (Create).
   Future<void> submit() async {

@@ -26,24 +26,12 @@ class QuizHubScreen extends StatelessWidget {
       MaterialPageRoute(
         builder: (_) => ChangeNotifierProvider(
           create: (_) =>
-              QuizViewModel(repository: repo, userId: userId)
-                ..loadQuiz(category: category),
+          QuizViewModel(repository: repo, userId: userId)
+            ..loadQuiz(category: category),
           child: const QuizPlayScreen(),
         ),
       ),
     );
-  }
-
-  void _seed(BuildContext context, QuizHistoryViewModel vm) async {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(const SnackBar(content: Text('Seeding quiz bank...')));
-    try {
-      await vm.seedQuestions();
-      messenger.showSnackBar(
-          const SnackBar(content: Text('Quiz bank seeded successfully!')));
-    } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Error seeding: $e')));
-    }
   }
 
   @override
@@ -53,13 +41,6 @@ class QuizHubScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('QUIZ ARENA'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.cloud_upload),
-            tooltip: 'Seed Quiz Bank',
-            onPressed: () => _seed(context, vm),
-          ),
-        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -74,16 +55,16 @@ class QuizHubScreen extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Each round has up to 5 multiple-choice questions.',
+            'Each round has up to 5 AI-generated questions.',
             style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
           ),
           const SizedBox(height: 16),
           ..._categories.map((c) => _CategoryCard(
-                label: c.$1,
-                icon: c.$2,
-                subtitle: c.$3,
-                onTap: () => _startQuiz(context, c.$1),
-              )),
+            label: c.$1,
+            icon: c.$2,
+            subtitle: c.$3,
+            onTap: () => _startQuiz(context, c.$1),
+          )),
           const SizedBox(height: 24),
           Row(
             children: [
@@ -160,7 +141,7 @@ class _CategoryCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
           backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
           child: Icon(icon, color: AppTheme.primary),
@@ -275,7 +256,7 @@ class _AttemptCard extends StatelessWidget {
               children: [
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: _scoreColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),

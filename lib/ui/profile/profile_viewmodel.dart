@@ -63,12 +63,29 @@ class ProfileViewModel extends ChangeNotifier {
       final url =
       await _repository.uploadAvatar(uid: uid, imageFile: _pickedImage!);
 
-      final updated =
-      (_profile ?? _emptyProfile()).copyWith(photoURL: url);
+      final updated = (_profile ?? _emptyProfile()).copyWith(photoURL: url);
       await _repository.updateProfile(updated);
       _profile = updated;
     } catch (e) {
       _error = 'Failed to update photo: $e';
+    } finally {
+      _isUploading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Removes the current profile photo (clears photoURL).
+  Future<void> removeAvatar() async {
+    _error = null;
+    _isUploading = true;
+    notifyListeners();
+    try {
+      final updated = (_profile ?? _emptyProfile()).copyWith(photoURL: '');
+      await _repository.updateProfile(updated);
+      _profile = updated;
+      _pickedImage = null;
+    } catch (e) {
+      _error = 'Failed to remove photo: $e';
     } finally {
       _isUploading = false;
       notifyListeners();
