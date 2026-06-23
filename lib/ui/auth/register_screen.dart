@@ -33,9 +33,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       email: _emailController.text.trim(),
       password: _passwordController.text,
     );
-    if (mounted && vm.error != null) {
+    if (!mounted) return;
+    if (vm.error != null) {
       _showError(vm.error!);
       vm.clearError();
+    } else {
+      Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
 

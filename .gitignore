@@ -13,6 +13,7 @@
 migrate_working_dir/
 CLAUDE.md
 .claude/
+temp/
 
 my_contribution.md
 android\app\google-services.json
